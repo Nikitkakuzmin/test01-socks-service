@@ -12,6 +12,21 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:latest
+        ports:
+          - 1001:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -35,9 +50,9 @@ jobs:
 
     - name: Run tests
       env:
-        SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
-        SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
-        SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+        SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:1001/postgres
+        SPRING_DATASOURCE_USERNAME: postgres
+        SPRING_DATASOURCE_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       run: ./gradlew test
 
     - name: Static code analysis (Checkstyle)
@@ -55,4 +70,6 @@ jobs:
     - name: Deploy to server
       if: success()
       run: |
-        echo "Здесь будут команды для деплоя JAR файла, например scp/ssh"
+        echo "Deploying JAR file to server"
+        scp -i ${{ secrets.SSH_PRIVATE_KEY }} build/libs/*.jar user@your-server:/path/to/deploy/directory
+        ssh -i ${{ secrets.SSH_PRIVATE_KEY }} user@your-server "java -jar /path/to/deploy/directory/socks-backspark.jar"
