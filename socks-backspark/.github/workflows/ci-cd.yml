@@ -1,0 +1,58 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'nik'
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.gradle/caches
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle
+
+    - name: Build with Gradle
+      run: ./gradlew clean build
+
+    - name: Run tests
+      env:
+        SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+        SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+        SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+      run: ./gradlew test
+
+    - name: Static code analysis (Checkstyle)
+      run: ./gradlew check
+
+    - name: Build JAR file
+      run: ./gradlew bootJar
+
+    - name: Upload JAR as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: socks-service-jar
+        path: build/libs/*.jar
+
+    - name: Deploy to server
+      if: success()
+      run: |
+        echo "Здесь будут команды для деплоя JAR файла, например scp/ssh"
